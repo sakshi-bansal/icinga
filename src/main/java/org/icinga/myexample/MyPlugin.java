@@ -45,30 +45,34 @@ public class MyPlugin extends MonitoringPlugin {
     nrsc     = properties.getProperty("notification-receiver-server-context");
     String serverPort = properties.getProperty("notification-receiver-server-port", "3081");
     nrsp = Integer.parseInt(serverPort);
-
-    testMeasurementResults ();
   }
 
-  public String getMeasurement (String host, String metric) {
+  public Item getMeasurement (String host, String metric) {
+    Item data = new Item();
     try{
       String url =  icingaApiURL +"/objects/services/" + host + "!" + metric;
       ProcessBuilder icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, url);
       Process connection = icingaApi.start();
       InputStream result = connection.getInputStream();
       BufferedReader content = new BufferedReader (new InputStreamReader (result));
-      String data = content.readLine();
-      System.out.print (data);
-      if (!data.contains("error"))
+      String line = content.readLine();
+      if (line.contains("error") || line.contains("Bad")) {
+        System.out.print ("Unable to process request");
+      } else {
+        data.setValue(content.readLine());
+        System.out.print (data);
 	return data;
-     } catch (Exception e) {
+      }
+    } catch (Exception e) {
        System.out.print ("Unable to process request");
-     }
+    }
     return null;
   }
 
- public List<String> getMeasurementResults (List<String> hostnames, List<String> metrics) {
-    List<String> results = new ArrayList<>();
-    String result;
+ //TODO : when priod > 0
+ public List<Item> getMeasurementResults (List<String> hostnames, List<String> metrics, String period) {
+    List<Item> results = new ArrayList<>();
+    Item result;
 
     for (String host:hostnames) {
       for (String metric:metrics) {
@@ -80,17 +84,6 @@ public class MyPlugin extends MonitoringPlugin {
       }
     }
     return results;
-  }
-
-  void testMeasurementResults () {
-    ArrayList<String> hosts = new ArrayList();
-    ArrayList<String> metrics = new ArrayList();
-    hosts.add("container1");
-    hosts.add("localhost");
-    metrics.add("ping4");
-    metrics.add("disk");
-
-    getMeasurementResults (hosts, metrics);
   }
 
   @Override
@@ -127,7 +120,8 @@ public class MyPlugin extends MonitoringPlugin {
   @Override
   public List<Item> queryPMJob(List<String> hostnames, List<String> metrics, String period)
       throws MonitoringException {
-    return null;
+    List<Item> results = getMeasurementResults (hostnames, metrics, period);
+    return results;
   }
   @Override
   public void subscribe() {}
