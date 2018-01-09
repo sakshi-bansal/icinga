@@ -19,29 +19,40 @@ import java.io.InputStreamReader;
 import java.util.List;
 
 public class MyPlugin extends MonitoringPlugin {
-  private String icingaApiURL = "https://localhost:5665/v1/";
-  private String nrsc = "/icingaplugin/notifications";
-  private Integer nrsp = 3081;
+  private String icingaApiURL;
+  private String host;
+  private String port;
+  private String version;
+  private String username;
+  private String password;
+  private String params;
+  private String nrsc;
+  private Integer nrsp;
 
   public MyPlugin() throws RemoteException, MonitoringException {
     init ();
-      /*try {
-        launchServer(notificationReceiverServerPort, notificationReceiverServerContext);
-      } catch (IOException e) {
-        throw new RemoteException(e.getMessage(), e);
-      }*/
   }
 
   private void init() throws RemoteException, MonitoringException {
+    loadProperties();
+    host     = properties.getProperty("icinga-host");
+    port     = properties.getProperty("icinga-port");
+    version  = properties.getProperty("icinga-version");
+    icingaApiURL = "https://" + host + ":" + port + version;
+    username = properties.getProperty("username");
+    password = properties.getProperty("password");
+    params = username + ":" + password;
+    nrsc     = properties.getProperty("notification-receiver-server-context");
+    String serverPort = properties.getProperty("notification-receiver-server-port", "3081");
+    nrsp = Integer.parseInt(serverPort);
+
     testMeasurementResults ();
-    //TODO
-    //get list of subscribers
   }
 
   public String getMeasurement (String host, String metric) {
     try{
-      String url =  icingaApiURL +"objects/services/" + host + "!" + metric;
-      ProcessBuilder icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", "root:icinga", url);
+      String url =  icingaApiURL +"/objects/services/" + host + "!" + metric;
+      ProcessBuilder icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, url);
       Process connection = icingaApi.start();
       InputStream result = connection.getInputStream();
       BufferedReader content = new BufferedReader (new InputStreamReader (result));
@@ -65,17 +76,19 @@ public class MyPlugin extends MonitoringPlugin {
         if (result != null)
           results.add (result);
         else
-          System.out.print ("Error: No object found for host " + host + " and metric" + metric);
+          System.out.print ("Error: No object found for host " + host + " and metric " + metric);
       }
     }
     return results;
   }
 
   void testMeasurementResults () {
-    List<String> hosts = new ArrayList<>();
-    List<String> metrics = new ArrayList<>();
-    hosts.add("container1, locahost");
-    metrics.add("ping4, disk");
+    ArrayList<String> hosts = new ArrayList();
+    ArrayList<String> metrics = new ArrayList();
+    hosts.add("container1");
+    hosts.add("localhost");
+    metrics.add("ping4");
+    metrics.add("disk");
 
     getMeasurementResults (hosts, metrics);
   }
@@ -142,7 +155,7 @@ public class MyPlugin extends MonitoringPlugin {
       throws IOException, InstantiationException, TimeoutException, IllegalAccessException,
           InvocationTargetException, NoSuchMethodException, InterruptedException {
     Logger log = LoggerFactory.getLogger(MyPlugin.class);
-      PluginStarter.registerPlugin(MyPlugin.class, "icinga", "localhost", 5672, 1);
+    PluginStarter.registerPlugin(MyPlugin.class, "icinga", "localhost", 5672, 1);
   }
 
 }
