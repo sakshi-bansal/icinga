@@ -26,8 +26,10 @@ public class MyPlugin extends MonitoringPlugin {
   private String username;
   private String password;
   private String params;
+  private IcingaApi icingaApi;
   private String nrsc;
   private Integer nrsp;
+  private Map<String, PMJob> pmJobs;
 
   public MyPlugin() throws RemoteException, MonitoringException {
     init ();
@@ -35,33 +37,31 @@ public class MyPlugin extends MonitoringPlugin {
 
   private void init() throws RemoteException, MonitoringException {
     loadProperties();
+
     host     = properties.getProperty("icinga-host");
     port     = properties.getProperty("icinga-port");
     version  = properties.getProperty("icinga-version");
-    icingaApiURL = "https://" + host + ":" + port + version;
+    icingaApiURL = "https://" + host + ":" + port + version + "/objects/services/";
     username = properties.getProperty("username");
     password = properties.getProperty("password");
     params = username + ":" + password;
     nrsc     = properties.getProperty("notification-receiver-server-context");
     String serverPort = properties.getProperty("notification-receiver-server-port", "3081");
     nrsp = Integer.parseInt(serverPort);
+
+    icingaApi = new IcingaApi (icingaApiURL, params);
+    pmJobs = new HashMap<>();
   }
 
-  public Item getMeasurement (String host, String metric) {
+  public Item getMeasurement (String hostname, String metric) {
     Item data = new Item();
     try{
-      String url =  icingaApiURL +"/objects/services/" + host + "!" + metric;
-      ProcessBuilder icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, url);
-      Process connection = icingaApi.start();
-      InputStream result = connection.getInputStream();
-      BufferedReader content = new BufferedReader (new InputStreamReader (result));
-      String line = content.readLine();
+      String line = icingaApi.getCommand (hostname, metric);
       if (line.contains("error") || line.contains("Bad")) {
         System.out.print ("Unable to process request");
       } else {
-        data.setValue(content.readLine());
-        System.out.print (data);
-	return data;
+          data.setValue(line);
+	  return data;
       }
     } catch (Exception e) {
        System.out.print ("Unable to process request");
@@ -102,6 +102,7 @@ public class MyPlugin extends MonitoringPlugin {
   public String unsubscribeForFault(String alarmEndpointId) {
     return null;
   }
+
   @Override
   public String createPMJob(
    ObjectSelection objectSelection,
@@ -110,19 +111,68 @@ public class MyPlugin extends MonitoringPlugin {
       Integer collectionPeriod,
       Integer reportingPeriod)
       throws MonitoringException {
-    return null;
+    if (objectSelection == null || objectSelection.getObjectInstanceIds().isEmpty())
+      throw new MonitoringException("The objectSelection is null or empty");
+    if (performanceMetrics == null && performanceMetricGroup == null)
+      throw new MonitoringException(
+          "At least performanceMetrics or performanceMetricGroup need to be present");
+    if (collectionPeriod < 0 || reportingPeriod < 0)
+      throw new MonitoringException("The collectionPeriod or reportingPeriod is negative");
+
+    PMJob pmjob = new PMJob (objectSelection, performanceMetrics, performanceMetricGroup,
+                 	     collectionPeriod, reportingPeriod);
+    try {
+      for (String host : objectSelection.getObjectInstanceIds()) {
+        for (String metric : performanceMetrics) {
+          icingaApi.putCommand (host, metric, collectionPeriod);
+        }
+      }
+    } catch (Exception e) {
+        System.out.print ("Failed to create new PMJob");
+    }
+
+    pmJobs.put(pmjob.getPMJobId(), pmjob);
+    return pmjob.getPMJobId();
   }
+
   @Override
   public List<String> deletePMJob(List<String> pmJobIdsToDelete) throws MonitoringException {
+    ObjectSelection objectSelection = null;
+    List<String> performanceMetrics = new ArrayList();
+ 
+    if (pmJobIdsToDelete == null)
+      throw new MonitoringException("The hostnames or metrics is null");
+
+    try{
+      for (String pmjobId: pmJobIdsToDelete) {
+      PMJob pmJob = pmJobs.get(pmjobId);
+      objectSelection = pmJob.getobjectSelection();
+      performanceMetrics = pmJob.getperformanceMetrics();
+      for (String hostname : objectSelection.getObjectInstanceIds()) {
+        for (String metric : performanceMetrics) {
+          icingaApi.deleteCommand(hostname, metric); 
+	}
+      }
+     }
+    } catch (Exception e) {
+        System.out.print ("Failed to create new PMJob");
+    }
     return null;
   }
 
   @Override
   public List<Item> queryPMJob(List<String> hostnames, List<String> metrics, String period)
       throws MonitoringException {
+    int timePeriod = Integer.parseInt(period);
+    if (hostnames == null || metrics == null)
+      throw new MonitoringException("The hostnames or metrics is null");
+    if (timePeriod < 0)
+      throw new MonitoringException("The period is negative");
+
     List<Item> results = getMeasurementResults (hostnames, metrics, period);
     return results;
   }
+
   @Override
   public void subscribe() {}
 
