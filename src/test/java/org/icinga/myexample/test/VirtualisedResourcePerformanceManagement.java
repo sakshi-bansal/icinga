@@ -17,15 +17,16 @@ public class VirtualisedResourcePerformanceManagement {
 
   @BeforeClass
   public static void init() throws RemoteException, InterruptedException, MonitoringException {
+System.out.println("init");
     myPlugin = new MyPlugin();
   }
 
   @Test
   public void testqueryPMJob() throws MonitoringException, InterruptedException {
+System.out.println("test query");
     List<String> hostnames = new ArrayList();
     List<String> metrics = new ArrayList();
     hostnames.add("container1");
-    metrics.add("ping4");
     metrics.add("disk");
     String period = "0";
     myPlugin.queryPMJob (hostnames, metrics, period);
@@ -33,12 +34,21 @@ public class VirtualisedResourcePerformanceManagement {
 
   @Test
   public void testcreatePMJob() throws MonitoringException, InterruptedException {
+System.out.println("test create");
     String pmjobId;
     ObjectSelection objectSelection = addObjects("localhost", "container1");
     List<String> performanceMetrics = addPerformanceMetrics("disk", "ping");
 
     //TODO: set correct durations
     pmjobId = myPlugin.createPMJob(objectSelection, performanceMetrics,
+ 				   new ArrayList<String>(), 10, 0);
+    pmjobIds.add(pmjobId);
+
+    ObjectSelection objectSelection2 = addObjects("container1");
+    List<String> performanceMetrics2 = addPerformanceMetrics("dns");
+
+    //TODO: set correct durations
+    pmjobId = myPlugin.createPMJob(objectSelection2, performanceMetrics2,
  				   new ArrayList<String>(), 10, 0);
     pmjobIds.add(pmjobId);
   }
