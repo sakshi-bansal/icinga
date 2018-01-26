@@ -27,21 +27,25 @@ public class IcingaApi {
     return null;
   }
 
-  public String getCommand (String hostname, String metric) {
+  public String allResults () {
     ProcessBuilder icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, url);
+    return sendRequest(icingaApi);
+  }
+
+  public String getCommand (String hostname, String metric) {
+    String sendurl = url + hostname + "!" + metric;
+    ProcessBuilder icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, sendurl);
     return sendRequest(icingaApi);
   }
 
   public String putCommand (String hostname, String metric, Integer collectionPeriod) {
     String sendurl = url + hostname + "!" + metric;
-    System.out.println("Create PMJob " + hostname + " " + metric);
     String attrs = "{\"templates\":[\"generic-service\"],\"attrs\":{\"check_command\":\""+metric+"\", \"check_interval\":"+collectionPeriod+"}}";
     ProcessBuilder icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, "-H", header, "-X", "PUT", sendurl, "-d", attrs);
     return sendRequest(icingaApi);
   }
 
   public String deleteCommand (String hostname, String metric) {
-    System.out.println("Delete PMJob " + hostname + " " + metric);
     String sendurl = url + hostname + "!" + metric;
     ProcessBuilder icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, "-H", header, "-X", "DELETE", sendurl);
     return sendRequest(icingaApi);

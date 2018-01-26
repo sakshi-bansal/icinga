@@ -1,17 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="org.icinga.myexample.test.VirtualisedResourcePerformanceManagement" tests="3" skipped="0" failures="0" errors="0" timestamp="2018-01-23T10:03:39" hostname="sakshi-Inspiron-3542" time="1.116">
+<testsuite name="org.icinga.myexample.test.VirtualisedResourcePerformanceManagement" tests="3" skipped="0" failures="0" errors="0" timestamp="2018-01-26T15:46:23" hostname="sakshi-Inspiron-3542" time="6.982">
   <properties/>
-  <testcase name="testdeletePMJob" classname="org.icinga.myexample.test.VirtualisedResourcePerformanceManagement" time="0.0"/>
-  <testcase name="testqueryPMJob" classname="org.icinga.myexample.test.VirtualisedResourcePerformanceManagement" time="0.207"/>
-  <testcase name="testcreatePMJob" classname="org.icinga.myexample.test.VirtualisedResourcePerformanceManagement" time="0.907"/>
+  <testcase name="testdeletePMJob" classname="org.icinga.myexample.test.VirtualisedResourcePerformanceManagement" time="0.001"/>
+  <testcase name="testqueryPMJob" classname="org.icinga.myexample.test.VirtualisedResourcePerformanceManagement" time="5.137"/>
+  <testcase name="testcreatePMJob" classname="org.icinga.myexample.test.VirtualisedResourcePerformanceManagement" time="1.84"/>
   <system-out><![CDATA[init
 test query
 test create
-Create PMJob localhost disk
-Create PMJob localhost ping
-Create PMJob container1 disk
-Create PMJob container1 ping
-Create PMJob container1 dns
 ]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

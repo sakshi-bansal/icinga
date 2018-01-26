@@ -239,6 +239,23 @@ public class MyPlugin extends MonitoringPlugin {
     return null;
   }
 
+  //Getting all measurements for all services
+  public Item getAllMeasurement () {
+    Item data = new Item();
+    try{
+      String line = icingaApi.allResults ();
+      if (line.contains("error") || line.contains("Bad")) {
+        System.out.print ("Unable to process request");
+      } else {
+          data.setValue(line);
+	  return data;
+      }
+    } catch (Exception e) {
+       System.out.print ("Unable to process request");
+    }
+    return null;
+  }
+
   public Item getMeasurement (String hostname, String metric) {
     Item data = new Item();
     try{
