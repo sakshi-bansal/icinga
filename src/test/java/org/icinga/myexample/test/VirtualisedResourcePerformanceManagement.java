@@ -14,6 +14,7 @@ import org.junit.BeforeClass;
 public class VirtualisedResourcePerformanceManagement {
   private static MyPlugin myPlugin;
   private List<String> pmjobIds = new ArrayList();
+  private List<String> thresholdIds = new ArrayList();
 
   @BeforeClass
   public static void init() throws RemoteException, InterruptedException, MonitoringException {
@@ -65,18 +66,23 @@ System.out.println("test create");
   }
 
   @Test
-  public void testcreateDeleteThreshold() throws MonitoringException, InterruptedException {
+  public void testcreateThreshold() throws MonitoringException, InterruptedException {
     ObjectSelection objectSelector = addObjects("container1");
     ThresholdDetails thresholdDetails =
-        new ThresholdDetails("last(0)", "=", PerceivedSeverity.CRITICAL, "0", "|");
+        new ThresholdDetails("", "", PerceivedSeverity.CRITICAL, "", "");
     thresholdDetails.setPerceivedSeverity(PerceivedSeverity.CRITICAL);
     String thresholdId = createThreshold(
             objectSelector, "ping", ThresholdType.SINGLE_VALUE, thresholdDetails);
+    thresholdIds.add(thresholdId);
+  }
 
-    List<String> thresholdIdsToDelete = new ArrayList<>();
-    thresholdIdsToDelete.add(thresholdId);
-
-    List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
+  @Test
+  public void testdeleteThreshold() throws MonitoringException, InterruptedException {
+    if (thresholdIds.size() > 0) {
+      List<String> thresholdIdsToDelete = new ArrayList<>();
+      thresholdIdsToDelete.add(thresholdIds.get(0));
+      List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
+    }
   }
 
   private ObjectSelection addObjects(String... args) {
