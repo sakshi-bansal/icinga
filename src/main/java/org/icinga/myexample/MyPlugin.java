@@ -26,6 +26,13 @@ import com.mashape.unirest.http.HttpMethod;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.exceptions.UnirestException;
+import org.json.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class MyPlugin extends MonitoringPlugin {
   private String icingaApiURL;
@@ -43,6 +50,9 @@ public class MyPlugin extends MonitoringPlugin {
   private List<AlarmEndpoint> alarmSubscriptions;
   private List<VRAlarm> vrAlarms;
   private Gson mapper;
+  private Map<String, String> triggeredThreshold;
+  private Map<String, Threshold> thresholds;
+  private Map<String, ScheduledExecutorService> schedulers;
 
   public MyPlugin() throws RemoteException, MonitoringException {
     init ();
@@ -67,8 +77,12 @@ public class MyPlugin extends MonitoringPlugin {
     alarmSubscriptions = new ArrayList<>();
     vrAlarms = new ArrayList<>();
     mapper = new GsonBuilder().setPrettyPrinting().create();
+    triggeredThreshold = new HashMap<>();
+    thresholds = new HashMap<>();
+    schedulers = new HashMap<>();
 
 //test ();
+//testThreshold();
   }
 
   private PerceivedSeverity getPerceivedSeverity(int triggerSeverity) {
@@ -136,7 +150,7 @@ public class MyPlugin extends MonitoringPlugin {
     vrAlarm.setThresholdId(notification.getTriggerId());
     vrAlarm.setAlarmState(AlarmState.FIRED);
     vrAlarm.setManagedObject(notification.getHostname());
-    vrAlarm.setPerceivedSeverity(getPerceivedSeverity(notification.getTriggerSeverity()));
+    vrAlarm.setPerceivedSeverity(notification.getTriggerSeverity());
 
     //EventTime: Time when the fault was observed.
     DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
@@ -307,6 +321,74 @@ public class MyPlugin extends MonitoringPlugin {
   @Override
   public void notifyInfo() {}
 
+  private boolean isNewNotification (String thresholdId) {
+    if (triggeredThreshold.get(thresholdId) == null)
+	return true;
+    return false;
+  }
+
+  private int getState (String result) {
+    String key = null;
+    String value = null;
+    int state = -1;
+
+    try {
+      JSONObject jsonobj = new JSONObject(result);
+      JSONArray getArray = jsonobj.getJSONArray("results");
+      jsonobj = getArray.getJSONObject(0);
+      Iterator<String> keys = jsonobj.keys();
+      while(keys.hasNext()){
+         key = keys.next();
+         value = jsonobj.getString(key);
+      }
+
+      jsonobj = new JSONObject(value);
+      keys = jsonobj.keys();
+      while(keys.hasNext()){
+        key = keys.next();
+	if (key.equals("state")) {
+          state = Integer.parseInt(jsonobj.getString(key));
+          return state;
+	}
+      }
+    } catch (JSONException e) {
+      System.out.println("Unable to get the status");
+    }
+    return state;
+  }
+
+  public class CheckThreshold implements Runnable {
+    private String hostname;
+    private String performanceMetric;
+    private Threshold threshold;
+
+    public CheckThreshold (String hostname, String performanceMetric,
+                           Threshold threshold) {
+      this.hostname = hostname;
+      this.performanceMetric = performanceMetric;
+      this.threshold = threshold;
+    }
+   
+    @Override
+    public void run() {
+    	  Item result = new Item();
+    	  IcingaNotification icingaNotification;
+    	  PerceivedSeverity perceivedSeverity = null;
+    	  String thresholdId = threshold.getThresholdId();
+    	  PerceivedSeverity thresholdPerceivedSeverity = threshold.getThresholdDetails().getPerceivedSeverity();
+    	  result = getMeasurement(hostname, performanceMetric);
+	  int state = getState(result.getValue());
+          perceivedSeverity = getPerceivedSeverity(state);
+    	  if (perceivedSeverity.equals(thresholdPerceivedSeverity) &&
+	      isNewNotification(thresholdId)) {
+            triggeredThreshold.put(thresholdId, hostname);
+	    icingaNotification = new IcingaNotification(thresholdId, perceivedSeverity,
+                                                        hostname, performanceMetric);
+            handleNotification(icingaNotification);
+          }
+    }
+  }
+
   @Override
   public String createThreshold(
       ObjectSelection objectSelector,
@@ -314,16 +396,83 @@ public class MyPlugin extends MonitoringPlugin {
       ThresholdType thresholdType,
       ThresholdDetails thresholdDetails)
       throws MonitoringException {
-    return null;
+    if (objectSelector == null)
+      throw new MonitoringException("The objectSelector is null or empty");
+    if ((performanceMetric == null && performanceMetric.isEmpty()))
+      throw new MonitoringException("The performanceMetric needs to be present");
+    if (thresholdDetails == null) throw new MonitoringException("The thresholdDetails is null");
+
+    Threshold threshold;
+    threshold = new Threshold(objectSelector, performanceMetric, thresholdType, thresholdDetails);
+    List<String> hostnames = objectSelector.getObjectInstanceIds();
+    String hostname = hostnames.get(0);
+
+    threshold.setThresholdId(IdGenerator.createUUID());
+
+    CheckThreshold checkThreshold = new CheckThreshold(hostname, performanceMetric, threshold);
+    checkThreshold.run();
+    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    scheduler.scheduleAtFixedRate(checkThreshold, 3, 3, TimeUnit.SECONDS);
+    thresholds.put(threshold.getThresholdId(), threshold);
+    schedulers.put(threshold.getThresholdId(), scheduler);
+    return threshold.getThresholdId();
   }
+
+  void shutdown(ExecutorService pool) {
+    pool.shutdown();
+    try {
+      if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+        pool.shutdownNow();
+        if (!pool.awaitTermination(60, TimeUnit.SECONDS))
+          System.err.println("Pool did not terminate");
+      }
+    } catch (InterruptedException ie) {
+      pool.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
+  }
+
   @Override
   public List<String> deleteThreshold(List<String> thresholdIds) throws MonitoringException {
-    return null;
+    if (thresholdIds == null) throw new MonitoringException("The list of thresholdIds ids is null");
+    if (thresholdIds.isEmpty()) throw new MonitoringException("The list of thresholdIds is empty");
+    List<String> thresholdIdsDeleted = new ArrayList<>();
+    try {
+      for (String thresholdIdToDelete : thresholdIds) {
+        Threshold thresholdToDelete = thresholds.get(thresholdIdToDelete);
+        if (thresholdToDelete != null) {
+	  triggeredThreshold.remove(thresholdIdToDelete);
+          thresholds.remove(thresholdIdToDelete);
+	  ScheduledExecutorService scheduler = schedulers.get(thresholdIdToDelete);
+ 	  shutdown(scheduler);
+	  thresholdIdsDeleted.add(thresholdIdToDelete);
+        }
+      }
+    } catch (Exception e) {
+      throw new MonitoringException("The thresholds cannot be deleted: " + e.getMessage(), e);
+    }
+    return thresholdIdsDeleted;
   }
+
   @Override
   public void queryThreshold(String queryFilter) {}
+/*
+  public void testThreshold()  throws RemoteException, MonitoringException{
 
-/*  public void test()  throws RemoteException, MonitoringException{
+    ObjectSelection objectSelector = addObjects("container1");
+    ThresholdDetails thresholdDetails =
+        new ThresholdDetails("last(0)", "=", PerceivedSeverity.CRITICAL, "0", "|");
+    thresholdDetails.setPerceivedSeverity(PerceivedSeverity.CRITICAL);
+    String thresholdId = createThreshold(
+            objectSelector, "ping", ThresholdType.SINGLE_VALUE, thresholdDetails);
+
+    List<String> thresholdIdsToDelete = new ArrayList<>();
+    thresholdIdsToDelete.add(thresholdId);
+
+    List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
+}
+*/
+  /*public void test()  throws RemoteException, MonitoringException{
     AlarmEndpoint alarmEndpoint = new AlarmEndpoint("fault-manager-of-container1","container1",
                                                     EndpointType.REST,"http://localhost:9000/alarm/vr",
                                                     PerceivedSeverity.WARNING);
@@ -353,8 +502,8 @@ public class MyPlugin extends MonitoringPlugin {
       deletePMJob(pmjobId2);
       pmjobIds.remove(pmjobIds.get(0));
   }
-
-  private ObjectSelection addObjects(String... args) {
+*/
+/*  private ObjectSelection addObjects(String... args) {
     ObjectSelection objectSelection  = new ObjectSelection();
     for (String arg : args) {
       objectSelection.addObjectInstanceId(arg);
@@ -368,8 +517,8 @@ public class MyPlugin extends MonitoringPlugin {
       performanceMetrics.add(arg);
     }
     return performanceMetrics;
-  }*/
-
+  }
+*/
   public static void main(String[] args)
       throws IOException, InstantiationException, TimeoutException, IllegalAccessException,
           InvocationTargetException, NoSuchMethodException, InterruptedException {

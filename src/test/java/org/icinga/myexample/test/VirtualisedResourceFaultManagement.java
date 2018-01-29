@@ -21,10 +21,10 @@ public class VirtualisedResourceFaultManagement {
   @BeforeClass
   public static void init() throws RemoteException, InterruptedException, MonitoringException {
 System.out.println("init");
-    myPlugin = new MyPlugin();
+    //myPlugin = new MyPlugin();
     subscriptionIds = new ArrayList();
   }
-
+/*
   @Test
   public void testSubscribeForFault() throws MonitoringException, InterruptedException {
     //Alarm endpoint is the default openbaton FMS
@@ -42,5 +42,5 @@ System.out.println("init");
 
   @Test
   public void testGetAlarmList() throws MonitoringException, InterruptedException {
-  }
+  }*/
 } 

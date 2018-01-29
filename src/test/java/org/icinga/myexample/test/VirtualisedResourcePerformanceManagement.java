@@ -18,10 +18,10 @@ public class VirtualisedResourcePerformanceManagement {
   @BeforeClass
   public static void init() throws RemoteException, InterruptedException, MonitoringException {
 System.out.println("init");
-    myPlugin = new MyPlugin();
+    //myPlugin = new MyPlugin();
   }
 
-  @Test
+  /*@Test
   public void testqueryPMJob() throws MonitoringException, InterruptedException {
 System.out.println("test query");
     List<String> hostnames = new ArrayList();
@@ -64,6 +64,21 @@ System.out.println("test create");
     }
   }
 
+  @Test
+  public void testcreateDeleteThreshold() throws MonitoringException, InterruptedException {
+    ObjectSelection objectSelector = addObjects("container1");
+    ThresholdDetails thresholdDetails =
+        new ThresholdDetails("last(0)", "=", PerceivedSeverity.CRITICAL, "0", "|");
+    thresholdDetails.setPerceivedSeverity(PerceivedSeverity.CRITICAL);
+    String thresholdId = createThreshold(
+            objectSelector, "ping", ThresholdType.SINGLE_VALUE, thresholdDetails);
+
+    List<String> thresholdIdsToDelete = new ArrayList<>();
+    thresholdIdsToDelete.add(thresholdId);
+
+    List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
+  }
+
   private ObjectSelection addObjects(String... args) {
     ObjectSelection objectSelection  = new ObjectSelection();
     for (String arg : args) {
@@ -79,5 +94,5 @@ System.out.println("test create");
     }
     return performanceMetrics;
   }
-
+*/
 } 
