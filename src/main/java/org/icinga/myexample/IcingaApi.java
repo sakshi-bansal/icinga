@@ -38,10 +38,22 @@ public class IcingaApi {
     return sendRequest(icingaApi);
   }
 
-  public String putCommand (String hostname, String metric, Integer collectionPeriod) {
+  public String putCommand (String hostname, String metric, Integer collectionPeriod, int force) {
     String sendurl = url + hostname + "!" + metric;
     String attrs = "{\"templates\":[\"generic-service\"],\"attrs\":{\"check_command\":\""+metric+"\", \"check_interval\":"+collectionPeriod+"}}";
     ProcessBuilder icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, "-H", header, "-X", "PUT", sendurl, "-d", attrs);
+    String result = sendRequest(icingaApi);
+    if (result.contains("does not exist") && force == 1) {
+      sendurl = "https://localhost:5665/v1/objects/hosts/" + hostname;
+      String check_command = "hostalive";
+      attrs = "{\"templates\":[\"generic-host\"],\"attrs\":{\"address\":\""+hostname+"\", \"check_command\":\"hostalive\", \"vars.os\":\"Linux\"}}";
+      icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, "-H", header, "-X", "PUT", sendurl, "-d", attrs);
+      result = sendRequest(icingaApi);
+    } else return null;
+
+    sendurl = url + hostname + "!" + metric;
+    attrs = "{\"templates\":[\"generic-service\"],\"attrs\":{\"check_command\":\""+metric+"\", \"check_interval\":"+collectionPeriod+"}}";
+    icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, "-H", header, "-X", "PUT", sendurl, "-d", attrs);
     return sendRequest(icingaApi);
   }
 

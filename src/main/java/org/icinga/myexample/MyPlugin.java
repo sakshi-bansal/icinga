@@ -22,6 +22,7 @@ import org.openbaton.catalogue.util.IdGenerator;
 import org.openbaton.catalogue.mano.common.faultmanagement.VirtualizedResourceAlarmNotification;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import com.mashape.unirest.http.HttpMethod;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
@@ -81,7 +82,7 @@ public class MyPlugin extends MonitoringPlugin {
     thresholds = new HashMap<>();
     schedulers = new HashMap<>();
 
-//test ();
+test ();
 //testThreshold();
   }
 
@@ -177,7 +178,6 @@ public class MyPlugin extends MonitoringPlugin {
   @Override
   public String subscribeForFault(AlarmEndpoint endpoint) throws MonitoringException {
     String subscriptionId = IdGenerator.createId();
-    System.out.print("subid " + subscriptionId);
     endpoint.setId(subscriptionId);
     alarmSubscriptions.add(endpoint);
     return subscriptionId;
@@ -214,10 +214,14 @@ public class MyPlugin extends MonitoringPlugin {
 
     PMJob pmjob = new PMJob (objectSelection, performanceMetrics, performanceMetricGroup,
                  	     collectionPeriod, reportingPeriod);
+    int force = Integer.parseInt(performanceMetrics.get(performanceMetrics.size() - 1));
     try {
       for (String host : objectSelection.getObjectInstanceIds()) {
         for (String metric : performanceMetrics) {
-          icingaApi.putCommand (host, metric, collectionPeriod);
+          String result = icingaApi.putCommand (host, metric, collectionPeriod, force);
+          if (result == null) {
+	    System.out.println ("Unable to create PMJob with hostname " + host + " and metric " + metric);
+          }
         }
       }
     } catch (Exception e) {
@@ -455,7 +459,13 @@ public class MyPlugin extends MonitoringPlugin {
   }
 
   @Override
-  public void queryThreshold(String queryFilter) {}
+  public void queryThreshold(String queryFilter) {
+    if (triggeredThreshold.get(queryFilter) == null) {
+      System.out.println ("Threshold has been triggered");
+    } else if (thresholds.get(queryFilter) == null) {
+      System.out.println ("Threshold does not exists");
+    }
+  }
 /*
   public void testThreshold()  throws RemoteException, MonitoringException{
 
@@ -472,22 +482,24 @@ public class MyPlugin extends MonitoringPlugin {
     List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
 }
 */
-  /*public void test()  throws RemoteException, MonitoringException{
+  public void test()  throws RemoteException, MonitoringException{
     AlarmEndpoint alarmEndpoint = new AlarmEndpoint("fault-manager-of-container1","container1",
                                                     EndpointType.REST,"http://localhost:9000/alarm/vr",
                                                     PerceivedSeverity.WARNING);
     String id = subscribeForFault(alarmEndpoint);
 
     String pmjobId;
-    ObjectSelection objectSelection = addObjects("container1");
-    List<String> performanceMetrics = addPerformanceMetrics("disk");
+    ObjectSelection objectSelection = addObjects("172.17.0.2");
+    List<String> performanceMetrics = addPerformanceMetrics("disk", "1");
 
     //TODO: set correct durations
+    long timestamp = System.currentTimeMillis();
+    System.out.println ("Starting time " + timestamp);
     pmjobId = createPMJob(objectSelection, performanceMetrics,
                                    new ArrayList<String>(), 10, 0);
     pmjobIds.add(pmjobId);
 
-    ObjectSelection objectSelection2 = addObjects("container1");
+    /*ObjectSelection objectSelection2 = addObjects("container1");
     List<String> performanceMetrics2 = addPerformanceMetrics("dns");
 
     //TODO: set correct durations
@@ -500,10 +512,10 @@ public class MyPlugin extends MonitoringPlugin {
       //Only testing with first PMJob
       pmjobId2.add(pmjobIds.get(0));
       deletePMJob(pmjobId2);
-      pmjobIds.remove(pmjobIds.get(0));
+      pmjobIds.remove(pmjobIds.get(0));*/
   }
-*/
-/*  private ObjectSelection addObjects(String... args) {
+
+  private ObjectSelection addObjects(String... args) {
     ObjectSelection objectSelection  = new ObjectSelection();
     for (String arg : args) {
       objectSelection.addObjectInstanceId(arg);
@@ -518,7 +530,7 @@ public class MyPlugin extends MonitoringPlugin {
     }
     return performanceMetrics;
   }
-*/
+
   public static void main(String[] args)
       throws IOException, InstantiationException, TimeoutException, IllegalAccessException,
           InvocationTargetException, NoSuchMethodException, InterruptedException {
