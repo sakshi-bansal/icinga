@@ -20,6 +20,7 @@ import java.io.InputStreamReader;
 import java.util.List;
 import org.openbaton.catalogue.util.IdGenerator;
 import org.openbaton.catalogue.mano.common.faultmanagement.VirtualizedResourceAlarmNotification;
+import org.openbaton.catalogue.mano.common.faultmanagement.VirtualizedResourceAlarmStateChangedNotification;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -82,8 +83,8 @@ public class MyPlugin extends MonitoringPlugin {
     thresholds = new HashMap<>();
     schedulers = new HashMap<>();
 
-test ();
-//testThreshold();
+//test ();
+testThreshold();
   }
 
   private PerceivedSeverity getPerceivedSeverity(int triggerSeverity) {
@@ -100,7 +101,7 @@ test ();
       case 3:
         return PerceivedSeverity.MINOR;
     }
-    return null;
+    return PerceivedSeverity.INDETERMINATE;
   }
 
   private List<AlarmEndpoint> getSubscribers(IcingaNotification notification) {
@@ -138,11 +139,18 @@ test ();
   @Override
   public void notifyFault(AlarmEndpoint endpoint, AbstractVirtualizedResourceAlarm event) {
     try {
-        VirtualizedResourceAlarmNotification vran = (VirtualizedResourceAlarmNotification) event;
-        String jsonAlarm = mapper.toJson(vran, VirtualizedResourceAlarmNotification.class);
-        restCallWithJson(endpoint.getEndpoint(), jsonAlarm, HttpMethod.PUT, "application/json");
+        if (event instanceof VirtualizedResourceAlarmNotification) {
+          VirtualizedResourceAlarmNotification vran = (VirtualizedResourceAlarmNotification) event;
+          String jsonAlarm = mapper.toJson(vran, VirtualizedResourceAlarmNotification.class);
+          restCallWithJson(endpoint.getEndpoint(), jsonAlarm, HttpMethod.PUT, "application/json");
+        } else if (event instanceof VirtualizedResourceAlarmStateChangedNotification) {
+          VirtualizedResourceAlarmStateChangedNotification vrascn =
+            (VirtualizedResourceAlarmStateChangedNotification) event;
+          String jsonAlarm = mapper.toJson(vrascn, VirtualizedResourceAlarmStateChangedNotification.class);
+          restCallWithJson(endpoint.getEndpoint(), jsonAlarm, HttpMethod.PUT, "application/json");
+	}
+
     } catch (Exception e) {
-      System.out.print ("Unable to send fault notification");
     }
   }
 
@@ -162,14 +170,20 @@ test ();
   }
 
   public void handleNotification (IcingaNotification notification) {
+    AbstractVirtualizedResourceAlarm alarmNotification;
     List<AlarmEndpoint> subscribers = getSubscribers(notification);
     if (subscribers.isEmpty()) {
       return;
     }
 
-    VRAlarm vrAlarm = createAlarm(notification);
-    AbstractVirtualizedResourceAlarm alarmNotification =
-            new VirtualizedResourceAlarmNotification(vrAlarm.getThresholdId(), vrAlarm);
+    if (notification.getAlarmType() == 0) {
+      VRAlarm vrAlarm = createAlarm(notification);
+      alarmNotification = new VirtualizedResourceAlarmNotification(vrAlarm.getThresholdId(), vrAlarm);
+    } else {
+      AlarmState alarmState = AlarmState.CLEARED;
+      alarmNotification = new VirtualizedResourceAlarmStateChangedNotification(notification.getTriggerId(), alarmState);
+    }
+
     for (AlarmEndpoint ae : subscribers) {
       notifyFault(ae, alarmNotification);
     }
@@ -365,12 +379,14 @@ test ();
     private String hostname;
     private String performanceMetric;
     private Threshold threshold;
+    private int flag;
 
     public CheckThreshold (String hostname, String performanceMetric,
                            Threshold threshold) {
       this.hostname = hostname;
       this.performanceMetric = performanceMetric;
       this.threshold = threshold;
+      flag = 1;
     }
    
     @Override
@@ -387,8 +403,14 @@ test ();
 	      isNewNotification(thresholdId)) {
             triggeredThreshold.put(thresholdId, hostname);
 	    icingaNotification = new IcingaNotification(thresholdId, perceivedSeverity,
-                                                        hostname, performanceMetric);
+                                                        hostname, performanceMetric, 0);
             handleNotification(icingaNotification);
+	    flag = 1;
+          } else if (!isNewNotification(thresholdId) && state == 0 && flag == 1) {
+            icingaNotification = new IcingaNotification(thresholdId, perceivedSeverity,
+                                                        hostname, performanceMetric, 1);
+	    handleNotification(icingaNotification);
+	    flag = 0;
           }
     }
   }
@@ -466,22 +488,34 @@ test ();
       System.out.println ("Threshold does not exists");
     }
   }
-/*
+
   public void testThreshold()  throws RemoteException, MonitoringException{
+        subscribeForFault(
+        new AlarmEndpoint(
+            "faults-consumer",
+            null,
+            EndpointType.REST,
+            "http://localhost:9000/alarm/vr",
+            PerceivedSeverity.MINOR));
+
+    AlarmEndpoint alarmEndpoint = new AlarmEndpoint("fault-manager-of-container1","container1",
+                                                    EndpointType.REST,"http://localhost:9000/alarm/vr",
+                                                    PerceivedSeverity.WARNING);
+    String id = subscribeForFault(alarmEndpoint);
 
     ObjectSelection objectSelector = addObjects("container1");
     ThresholdDetails thresholdDetails =
         new ThresholdDetails("last(0)", "=", PerceivedSeverity.CRITICAL, "0", "|");
     thresholdDetails.setPerceivedSeverity(PerceivedSeverity.CRITICAL);
     String thresholdId = createThreshold(
-            objectSelector, "ping", ThresholdType.SINGLE_VALUE, thresholdDetails);
+            objectSelector, "ping4", ThresholdType.SINGLE_VALUE, thresholdDetails);
 
-    List<String> thresholdIdsToDelete = new ArrayList<>();
-    thresholdIdsToDelete.add(thresholdId);
+//    List<String> thresholdIdsToDelete = new ArrayList<>();
+ //   thresholdIdsToDelete.add(thresholdId);
 
-    List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
+   // List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
 }
-*/
+/*
   public void test()  throws RemoteException, MonitoringException{
     AlarmEndpoint alarmEndpoint = new AlarmEndpoint("fault-manager-of-container1","container1",
                                                     EndpointType.REST,"http://localhost:9000/alarm/vr",
@@ -489,15 +523,22 @@ test ();
     String id = subscribeForFault(alarmEndpoint);
 
     String pmjobId;
-    ObjectSelection objectSelection = addObjects("172.17.0.2");
-    List<String> performanceMetrics = addPerformanceMetrics("disk", "1");
+    //ObjectSelection objectSelection = addObjects("172.17.0.2");
+    //ObjectSelection objectSelection = addObjects("172.17.0.2", "172.17.0.3", "172.17.0.4", "172.17.0.5", "172.17.0.6");
+
+   // ObjectSelection objectSelection = addObjects("172.17.0.2", "172.17.0.3", "172.17.0.4", "172.17.0.5", "172.17.0.6", "172.17.0.7", "172.17.0.8", "172.17.0.9", "172.17.0.10", "172.17.0.11");
+
+    //ObjectSelection objectSelection = addObjects("172.17.0.2", "172.17.0.3", "172.17.0.4", "172.17.0.5", "172.17.0.6", "172.17.0.7", "172.17.0.8", "172.17.0.9", "172.17.0.10", "172.17.0.11", "172.17.0.12", "172.17.0.13", "172.17.0.14", "172.17.0.15", "172.17.0.16");
+
+    //ObjectSelection objectSelection = addObjects("172.17.0.2", "172.17.0.3", "172.17.0.4", "172.17.0.5", "172.17.0.6", "172.17.0.7", "172.17.0.8", "172.17.0.9", "172.17.0.10", "172.17.0.11", "172.17.0.12", "172.17.0.13", "172.17.0.14", "172.17.0.15", "172.17.0.16", "172.17.0.17", "172.17.0.18", "172.17.0.19", "172.17.0.20", "172.17.0.21");
+
+    //List<String> performanceMetrics = addPerformanceMetrics("ping4", "1");
+    //List<String> performanceMetrics = addPerformanceMetrics("ping4", "tcp", "udp", "ssl", "disk", "mem", "swap", "procs", "ssh", "users", "1");
 
     //TODO: set correct durations
-    long timestamp = System.currentTimeMillis();
-    System.out.println ("Starting time " + timestamp);
-    pmjobId = createPMJob(objectSelection, performanceMetrics,
-                                   new ArrayList<String>(), 10, 0);
-    pmjobIds.add(pmjobId);
+    //pmjobId = createPMJob(objectSelection, performanceMetrics,
+      //                             new ArrayList<String>(), 10, 0);
+    //pmjobIds.add(pmjobId);
 
     /*ObjectSelection objectSelection2 = addObjects("container1");
     List<String> performanceMetrics2 = addPerformanceMetrics("dns");
@@ -512,9 +553,49 @@ test ();
       //Only testing with first PMJob
       pmjobId2.add(pmjobIds.get(0));
       deletePMJob(pmjobId2);
-      pmjobIds.remove(pmjobIds.get(0));*/
-  }
+      pmjobIds.remove(pmjobIds.get(0));
 
+    long timestamp = System.currentTimeMillis();
+    System.out.println ("Starting time " + timestamp);
+
+    List<String> hostnames = new ArrayList();
+    List<String> metrics = new ArrayList();
+    hostnames.add("172.17.0.2");
+    hostnames.add("172.17.0.3");
+    hostnames.add("172.17.0.4");
+    hostnames.add("172.17.0.5");
+    hostnames.add("172.17.0.6");
+    hostnames.add("172.17.0.7");
+    hostnames.add("172.17.0.8");
+    hostnames.add("172.17.0.9");
+    hostnames.add("172.17.0.10");
+    hostnames.add("172.17.0.11");
+    hostnames.add("172.17.0.12");
+    hostnames.add("172.17.0.13");
+    hostnames.add("172.17.0.14");
+    hostnames.add("172.17.0.15");
+    hostnames.add("172.17.0.16");
+    hostnames.add("172.17.0.17");
+    hostnames.add("172.17.0.18");
+    hostnames.add("172.17.0.19");
+    hostnames.add("172.17.0.20");
+    hostnames.add("172.17.0.21");
+    metrics.add("ping4");
+    metrics.add("tcp");
+    metrics.add("udp");
+    metrics.add("ssl");
+    metrics.add("ssh");
+    metrics.add("mem");
+    metrics.add("disk");
+    metrics.add("procs");
+    metrics.add("users");
+    metrics.add("swap");
+    String period = "0";
+    queryPMJob (hostnames, metrics, period);
+    timestamp = System.currentTimeMillis();
+    System.out.println ("Ending time " + timestamp);
+  }
+*/ 
   private ObjectSelection addObjects(String... args) {
     ObjectSelection objectSelection  = new ObjectSelection();
     for (String arg : args) {
@@ -522,7 +603,7 @@ test ();
     }
     return objectSelection;
   }
-
+/*
   private List<String> addPerformanceMetrics(String... args) {
     List<String> performanceMetrics = new ArrayList<>();
     for (String arg : args) {
@@ -530,7 +611,7 @@ test ();
     }
     return performanceMetrics;
   }
-
+*/
   public static void main(String[] args)
       throws IOException, InstantiationException, TimeoutException, IllegalAccessException,
           InvocationTargetException, NoSuchMethodException, InterruptedException {

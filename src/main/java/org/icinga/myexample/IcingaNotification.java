@@ -11,9 +11,11 @@ public class IcingaNotification {
   private String metricName;
   private int eventId;
   private String eventDate;
+  private int alarmType; //0:new alarm, 1:state change alarm
   private String eventTime;
 
-  public IcingaNotification(String triggerId, PerceivedSeverity triggerSeverity, String hostname, String metricName) {
+  public IcingaNotification(String triggerId, PerceivedSeverity triggerSeverity,
+			    String hostname, String metricName, int alarmType) {
     this.triggerId = triggerId;
     this.triggerSeverity = triggerSeverity;
     this.hostname = hostname;
@@ -34,5 +36,9 @@ public class IcingaNotification {
 
   public String getMetricname() {
     return metricName;
+  }
+
+  public int getAlarmType() {
+    return alarmType;
   }
 }

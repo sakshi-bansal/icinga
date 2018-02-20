@@ -49,12 +49,13 @@ public class IcingaApi {
       attrs = "{\"templates\":[\"generic-host\"],\"attrs\":{\"address\":\""+hostname+"\", \"check_command\":\"hostalive\", \"vars.os\":\"Linux\"}}";
       icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, "-H", header, "-X", "PUT", sendurl, "-d", attrs);
       result = sendRequest(icingaApi);
-    } else return null;
+    } else return result;
 
     sendurl = url + hostname + "!" + metric;
     attrs = "{\"templates\":[\"generic-service\"],\"attrs\":{\"check_command\":\""+metric+"\", \"check_interval\":"+collectionPeriod+"}}";
     icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, "-H", header, "-X", "PUT", sendurl, "-d", attrs);
-    return sendRequest(icingaApi);
+    result = sendRequest(icingaApi);
+return result;
   }
 
   public String deleteCommand (String hostname, String metric) {
