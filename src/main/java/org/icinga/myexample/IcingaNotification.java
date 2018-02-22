@@ -20,6 +20,7 @@ public class IcingaNotification {
     this.triggerSeverity = triggerSeverity;
     this.hostname = hostname;
     this.metricName = metricName;
+    this.alarmType = alarmType;
   }
 
   public String getTriggerId() {

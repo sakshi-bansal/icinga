@@ -83,7 +83,11 @@ public class MyPlugin extends MonitoringPlugin {
     thresholds = new HashMap<>();
     schedulers = new HashMap<>();
 
-//test ();
+test ();
+try{
+TimeUnit.SECONDS.sleep(10);
+} catch (Exception e) {
+}
 testThreshold();
   }
 
@@ -140,10 +144,14 @@ testThreshold();
   public void notifyFault(AlarmEndpoint endpoint, AbstractVirtualizedResourceAlarm event) {
     try {
         if (event instanceof VirtualizedResourceAlarmNotification) {
+	  System.out.println("Raising alarm!!!!!");
+	  System.out.println("Host container1, service ping is in CRITICAL state!!!!!");
           VirtualizedResourceAlarmNotification vran = (VirtualizedResourceAlarmNotification) event;
           String jsonAlarm = mapper.toJson(vran, VirtualizedResourceAlarmNotification.class);
           restCallWithJson(endpoint.getEndpoint(), jsonAlarm, HttpMethod.PUT, "application/json");
         } else if (event instanceof VirtualizedResourceAlarmStateChangedNotification) {
+	  System.out.println("Alarm state has changed");
+	  System.out.println("Host container1, service ping is now OK");
           VirtualizedResourceAlarmStateChangedNotification vrascn =
             (VirtualizedResourceAlarmStateChangedNotification) event;
           String jsonAlarm = mapper.toJson(vrascn, VirtualizedResourceAlarmStateChangedNotification.class);
@@ -490,112 +498,87 @@ testThreshold();
   }
 
   public void testThreshold()  throws RemoteException, MonitoringException{
-        subscribeForFault(
-        new AlarmEndpoint(
-            "faults-consumer",
-            null,
-            EndpointType.REST,
-            "http://localhost:9000/alarm/vr",
-            PerceivedSeverity.MINOR));
-
     AlarmEndpoint alarmEndpoint = new AlarmEndpoint("fault-manager-of-container1","container1",
                                                     EndpointType.REST,"http://localhost:9000/alarm/vr",
                                                     PerceivedSeverity.WARNING);
     String id = subscribeForFault(alarmEndpoint);
 
+    System.out.println("Creating new threshold");
+    System.out.println("Hostnames : container1   Metrics : ping   Severity : CRITICAL");
     ObjectSelection objectSelector = addObjects("container1");
     ThresholdDetails thresholdDetails =
         new ThresholdDetails("last(0)", "=", PerceivedSeverity.CRITICAL, "0", "|");
     thresholdDetails.setPerceivedSeverity(PerceivedSeverity.CRITICAL);
     String thresholdId = createThreshold(
             objectSelector, "ping4", ThresholdType.SINGLE_VALUE, thresholdDetails);
-
+    System.out.println("Threshold is created");
 //    List<String> thresholdIdsToDelete = new ArrayList<>();
  //   thresholdIdsToDelete.add(thresholdId);
 
    // List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
 }
-/*
+
+  private int getProperResult (String result) {
+    String key = null;
+    String value = null;
+    int state = -1;
+
+    try {
+      JSONObject jsonobj = new JSONObject(result);
+      JSONArray getArray = jsonobj.getJSONArray("results");
+      jsonobj = getArray.getJSONObject(0);
+      Iterator<String> keys = jsonobj.keys();
+      while(keys.hasNext()){
+         key = keys.next();
+         value = jsonobj.getString(key);
+      }
+
+      jsonobj = new JSONObject(value);
+      keys = jsonobj.keys();
+      while(keys.hasNext()){
+        key = keys.next();
+	if (key.equals("state")) {
+          state = Integer.parseInt(jsonobj.getString(key));
+	  if (state == 0) {
+	    System.out.println("PING OK - Packet loss = 0%");
+	  }
+          return state;
+	}
+      }
+    } catch (JSONException e) {
+      System.out.println("Unable to get the status");
+    }
+    return state;
+  }
+
   public void test()  throws RemoteException, MonitoringException{
-    AlarmEndpoint alarmEndpoint = new AlarmEndpoint("fault-manager-of-container1","container1",
-                                                    EndpointType.REST,"http://localhost:9000/alarm/vr",
-                                                    PerceivedSeverity.WARNING);
-    String id = subscribeForFault(alarmEndpoint);
 
     String pmjobId;
-    //ObjectSelection objectSelection = addObjects("172.17.0.2");
-    //ObjectSelection objectSelection = addObjects("172.17.0.2", "172.17.0.3", "172.17.0.4", "172.17.0.5", "172.17.0.6");
+    ObjectSelection objectSelection = addObjects("container1");
+    List<String> performanceMetrics = addPerformanceMetrics("ping4", "1");
 
-   // ObjectSelection objectSelection = addObjects("172.17.0.2", "172.17.0.3", "172.17.0.4", "172.17.0.5", "172.17.0.6", "172.17.0.7", "172.17.0.8", "172.17.0.9", "172.17.0.10", "172.17.0.11");
-
-    //ObjectSelection objectSelection = addObjects("172.17.0.2", "172.17.0.3", "172.17.0.4", "172.17.0.5", "172.17.0.6", "172.17.0.7", "172.17.0.8", "172.17.0.9", "172.17.0.10", "172.17.0.11", "172.17.0.12", "172.17.0.13", "172.17.0.14", "172.17.0.15", "172.17.0.16");
-
-    //ObjectSelection objectSelection = addObjects("172.17.0.2", "172.17.0.3", "172.17.0.4", "172.17.0.5", "172.17.0.6", "172.17.0.7", "172.17.0.8", "172.17.0.9", "172.17.0.10", "172.17.0.11", "172.17.0.12", "172.17.0.13", "172.17.0.14", "172.17.0.15", "172.17.0.16", "172.17.0.17", "172.17.0.18", "172.17.0.19", "172.17.0.20", "172.17.0.21");
-
-    //List<String> performanceMetrics = addPerformanceMetrics("ping4", "1");
-    //List<String> performanceMetrics = addPerformanceMetrics("ping4", "tcp", "udp", "ssl", "disk", "mem", "swap", "procs", "ssh", "users", "1");
-
-    //TODO: set correct durations
-    //pmjobId = createPMJob(objectSelection, performanceMetrics,
-      //                             new ArrayList<String>(), 10, 0);
-    //pmjobIds.add(pmjobId);
-
-    /*ObjectSelection objectSelection2 = addObjects("container1");
-    List<String> performanceMetrics2 = addPerformanceMetrics("dns");
-
-    //TODO: set correct durations
-    pmjobId = createPMJob(objectSelection2, performanceMetrics2,
-                                   new ArrayList<String>(), 10, 0);
+    System.out.println("Creating new performance metric");
+    System.out.println("Hostnames : container1   Metrics : ping");
+    pmjobId = createPMJob(objectSelection, performanceMetrics, new ArrayList<String>(), 10, 0);
     pmjobIds.add(pmjobId);
-
-//Delete PMJOB id
-      List <String> pmjobId2 = new ArrayList();
-      //Only testing with first PMJob
-      pmjobId2.add(pmjobIds.get(0));
-      deletePMJob(pmjobId2);
-      pmjobIds.remove(pmjobIds.get(0));
-
-    long timestamp = System.currentTimeMillis();
-    System.out.println ("Starting time " + timestamp);
+    System.out.println("A PM Job is created");
 
     List<String> hostnames = new ArrayList();
     List<String> metrics = new ArrayList();
-    hostnames.add("172.17.0.2");
-    hostnames.add("172.17.0.3");
-    hostnames.add("172.17.0.4");
-    hostnames.add("172.17.0.5");
-    hostnames.add("172.17.0.6");
-    hostnames.add("172.17.0.7");
-    hostnames.add("172.17.0.8");
-    hostnames.add("172.17.0.9");
-    hostnames.add("172.17.0.10");
-    hostnames.add("172.17.0.11");
-    hostnames.add("172.17.0.12");
-    hostnames.add("172.17.0.13");
-    hostnames.add("172.17.0.14");
-    hostnames.add("172.17.0.15");
-    hostnames.add("172.17.0.16");
-    hostnames.add("172.17.0.17");
-    hostnames.add("172.17.0.18");
-    hostnames.add("172.17.0.19");
-    hostnames.add("172.17.0.20");
-    hostnames.add("172.17.0.21");
+    hostnames.add("container1");
     metrics.add("ping4");
-    metrics.add("tcp");
-    metrics.add("udp");
-    metrics.add("ssl");
-    metrics.add("ssh");
-    metrics.add("mem");
-    metrics.add("disk");
-    metrics.add("procs");
-    metrics.add("users");
-    metrics.add("swap");
     String period = "0";
-    queryPMJob (hostnames, metrics, period);
-    timestamp = System.currentTimeMillis();
-    System.out.println ("Ending time " + timestamp);
+    List<Item> result = queryPMJob (hostnames, metrics, period);
+    for (Item r : result)
+      getProperResult(r.getValue());
+      //Delete PMJOB id
+      /*List <String> pmjobId2 = new ArrayList();
+      //Only testing with first PMJob
+      pmjobId2.add(pmjobIds.get(0));
+      deletePMJob(pmjobId2);
+      pmjobIds.remove(pmjobIds.get(0));*/
   }
-*/ 
+ 
   private ObjectSelection addObjects(String... args) {
     ObjectSelection objectSelection  = new ObjectSelection();
     for (String arg : args) {
@@ -603,7 +586,7 @@ testThreshold();
     }
     return objectSelection;
   }
-/*
+
   private List<String> addPerformanceMetrics(String... args) {
     List<String> performanceMetrics = new ArrayList<>();
     for (String arg : args) {
@@ -611,7 +594,7 @@ testThreshold();
     }
     return performanceMetrics;
   }
-*/
+
   public static void main(String[] args)
       throws IOException, InstantiationException, TimeoutException, IllegalAccessException,
           InvocationTargetException, NoSuchMethodException, InterruptedException {

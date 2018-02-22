@@ -46,7 +46,8 @@ public class IcingaApi {
     if (result.contains("does not exist") && force == 1) {
       sendurl = "https://localhost:5665/v1/objects/hosts/" + hostname;
       String check_command = "hostalive";
-      attrs = "{\"templates\":[\"generic-host\"],\"attrs\":{\"address\":\""+hostname+"\", \"check_command\":\"hostalive\", \"vars.os\":\"Linux\"}}";
+      String hostaddr = "172.17.0.2";
+      attrs = "{\"templates\":[\"generic-host\"],\"attrs\":{\"address\":\""+hostaddr+"\", \"check_command\":\"hostalive\", \"vars.os\":\"Linux\"}}";
       icingaApi = new ProcessBuilder("curl", "-k", "-s", "-u", params, "-H", header, "-X", "PUT", sendurl, "-d", attrs);
       result = sendRequest(icingaApi);
     } else return result;
