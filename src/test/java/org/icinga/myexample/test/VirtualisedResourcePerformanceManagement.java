@@ -8,6 +8,11 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.Test;
 import org.junit.BeforeClass;
+import org.openbaton.catalogue.mano.common.monitoring.AlarmEndpoint;
+import org.openbaton.catalogue.mano.common.monitoring.PerceivedSeverity;
+import org.openbaton.catalogue.nfvo.EndpointType;
+import org.openbaton.catalogue.mano.common.monitoring.ThresholdType;
+import org.openbaton.catalogue.mano.common.monitoring.ThresholdDetails;
 
 //TODO: Set correct time intervals and test occurences
 
@@ -18,13 +23,11 @@ public class VirtualisedResourcePerformanceManagement {
 
   @BeforeClass
   public static void init() throws RemoteException, InterruptedException, MonitoringException {
-System.out.println("init");
-    //myPlugin = new MyPlugin();
+    myPlugin = new MyPlugin();
   }
 
-  /*@Test
+  @Test
   public void testqueryPMJob() throws MonitoringException, InterruptedException {
-System.out.println("test query");
     List<String> hostnames = new ArrayList();
     List<String> metrics = new ArrayList();
     hostnames.add("container1");
@@ -35,10 +38,9 @@ System.out.println("test query");
 
   @Test
   public void testcreatePMJob() throws MonitoringException, InterruptedException {
-System.out.println("test create");
     String pmjobId;
     ObjectSelection objectSelection = addObjects("localhost", "container1");
-    List<String> performanceMetrics = addPerformanceMetrics("disk", "ping");
+    List<String> performanceMetrics = addPerformanceMetrics("disk", "ping4", "1");
 
     //TODO: set correct durations
     pmjobId = myPlugin.createPMJob(objectSelection, performanceMetrics,
@@ -46,7 +48,7 @@ System.out.println("test create");
     pmjobIds.add(pmjobId);
 
     ObjectSelection objectSelection2 = addObjects("container1");
-    List<String> performanceMetrics2 = addPerformanceMetrics("dns");
+    List<String> performanceMetrics2 = addPerformanceMetrics("dns", "1");
 
     //TODO: set correct durations
     pmjobId = myPlugin.createPMJob(objectSelection2, performanceMetrics2,
@@ -67,12 +69,17 @@ System.out.println("test create");
 
   @Test
   public void testcreateThreshold() throws MonitoringException, InterruptedException {
+    AlarmEndpoint alarmEndpoint = new AlarmEndpoint("fault-manager-of-container1","container1",
+                                                    EndpointType.REST,"http://localhost:9000/alarm/vr",
+                                                    PerceivedSeverity.WARNING);
+    String id = myPlugin.subscribeForFault(alarmEndpoint);
+
     ObjectSelection objectSelector = addObjects("container1");
     ThresholdDetails thresholdDetails =
         new ThresholdDetails("", "", PerceivedSeverity.CRITICAL, "", "");
     thresholdDetails.setPerceivedSeverity(PerceivedSeverity.CRITICAL);
-    String thresholdId = createThreshold(
-            objectSelector, "ping", ThresholdType.SINGLE_VALUE, thresholdDetails);
+    String thresholdId = myPlugin.createThreshold(
+            objectSelector, "ping4", ThresholdType.SINGLE_VALUE, thresholdDetails);
     thresholdIds.add(thresholdId);
   }
 
@@ -81,7 +88,7 @@ System.out.println("test create");
     if (thresholdIds.size() > 0) {
       List<String> thresholdIdsToDelete = new ArrayList<>();
       thresholdIdsToDelete.add(thresholdIds.get(0));
-      List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
+      List<String> thresholdIdsDeleted = myPlugin.deleteThreshold(thresholdIdsToDelete);
     }
   }
 
@@ -100,5 +107,4 @@ System.out.println("test create");
     }
     return performanceMetrics;
   }
-*/
 } 

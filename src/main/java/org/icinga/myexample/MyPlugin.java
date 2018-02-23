@@ -82,13 +82,6 @@ public class MyPlugin extends MonitoringPlugin {
     triggeredThreshold = new HashMap<>();
     thresholds = new HashMap<>();
     schedulers = new HashMap<>();
-
-test ();
-try{
-TimeUnit.SECONDS.sleep(10);
-} catch (Exception e) {
-}
-testThreshold();
   }
 
   private PerceivedSeverity getPerceivedSeverity(int triggerSeverity) {
@@ -145,13 +138,11 @@ testThreshold();
     try {
         if (event instanceof VirtualizedResourceAlarmNotification) {
 	  System.out.println("Raising alarm!!!!!");
-	  System.out.println("Host container1, service ping is in CRITICAL state!!!!!");
           VirtualizedResourceAlarmNotification vran = (VirtualizedResourceAlarmNotification) event;
           String jsonAlarm = mapper.toJson(vran, VirtualizedResourceAlarmNotification.class);
           restCallWithJson(endpoint.getEndpoint(), jsonAlarm, HttpMethod.PUT, "application/json");
         } else if (event instanceof VirtualizedResourceAlarmStateChangedNotification) {
 	  System.out.println("Alarm state has changed");
-	  System.out.println("Host container1, service ping is now OK");
           VirtualizedResourceAlarmStateChangedNotification vrascn =
             (VirtualizedResourceAlarmStateChangedNotification) event;
           String jsonAlarm = mapper.toJson(vrascn, VirtualizedResourceAlarmStateChangedNotification.class);
@@ -495,104 +486,6 @@ testThreshold();
     } else if (thresholds.get(queryFilter) == null) {
       System.out.println ("Threshold does not exists");
     }
-  }
-
-  public void testThreshold()  throws RemoteException, MonitoringException{
-    AlarmEndpoint alarmEndpoint = new AlarmEndpoint("fault-manager-of-container1","container1",
-                                                    EndpointType.REST,"http://localhost:9000/alarm/vr",
-                                                    PerceivedSeverity.WARNING);
-    String id = subscribeForFault(alarmEndpoint);
-
-    System.out.println("Creating new threshold");
-    System.out.println("Hostnames : container1   Metrics : ping   Severity : CRITICAL");
-    ObjectSelection objectSelector = addObjects("container1");
-    ThresholdDetails thresholdDetails =
-        new ThresholdDetails("last(0)", "=", PerceivedSeverity.CRITICAL, "0", "|");
-    thresholdDetails.setPerceivedSeverity(PerceivedSeverity.CRITICAL);
-    String thresholdId = createThreshold(
-            objectSelector, "ping4", ThresholdType.SINGLE_VALUE, thresholdDetails);
-    System.out.println("Threshold is created");
-//    List<String> thresholdIdsToDelete = new ArrayList<>();
- //   thresholdIdsToDelete.add(thresholdId);
-
-   // List<String> thresholdIdsDeleted = deleteThreshold(thresholdIdsToDelete);
-}
-
-  private int getProperResult (String result) {
-    String key = null;
-    String value = null;
-    int state = -1;
-
-    try {
-      JSONObject jsonobj = new JSONObject(result);
-      JSONArray getArray = jsonobj.getJSONArray("results");
-      jsonobj = getArray.getJSONObject(0);
-      Iterator<String> keys = jsonobj.keys();
-      while(keys.hasNext()){
-         key = keys.next();
-         value = jsonobj.getString(key);
-      }
-
-      jsonobj = new JSONObject(value);
-      keys = jsonobj.keys();
-      while(keys.hasNext()){
-        key = keys.next();
-	if (key.equals("state")) {
-          state = Integer.parseInt(jsonobj.getString(key));
-	  if (state == 0) {
-	    System.out.println("PING OK - Packet loss = 0%");
-	  }
-          return state;
-	}
-      }
-    } catch (JSONException e) {
-      System.out.println("Unable to get the status");
-    }
-    return state;
-  }
-
-  public void test()  throws RemoteException, MonitoringException{
-
-    String pmjobId;
-    ObjectSelection objectSelection = addObjects("container1");
-    List<String> performanceMetrics = addPerformanceMetrics("ping4", "1");
-
-    System.out.println("Creating new performance metric");
-    System.out.println("Hostnames : container1   Metrics : ping");
-    pmjobId = createPMJob(objectSelection, performanceMetrics, new ArrayList<String>(), 10, 0);
-    pmjobIds.add(pmjobId);
-    System.out.println("A PM Job is created");
-
-    List<String> hostnames = new ArrayList();
-    List<String> metrics = new ArrayList();
-    hostnames.add("container1");
-    metrics.add("ping4");
-    String period = "0";
-    List<Item> result = queryPMJob (hostnames, metrics, period);
-    for (Item r : result)
-      getProperResult(r.getValue());
-      //Delete PMJOB id
-      /*List <String> pmjobId2 = new ArrayList();
-      //Only testing with first PMJob
-      pmjobId2.add(pmjobIds.get(0));
-      deletePMJob(pmjobId2);
-      pmjobIds.remove(pmjobIds.get(0));*/
-  }
- 
-  private ObjectSelection addObjects(String... args) {
-    ObjectSelection objectSelection  = new ObjectSelection();
-    for (String arg : args) {
-      objectSelection.addObjectInstanceId(arg);
-    }
-    return objectSelection;
-  }
-
-  private List<String> addPerformanceMetrics(String... args) {
-    List<String> performanceMetrics = new ArrayList<>();
-    for (String arg : args) {
-      performanceMetrics.add(arg);
-    }
-    return performanceMetrics;
   }
 
   public static void main(String[] args)
