@@ -1,1 +1,82 @@
-Converted to git diretory for build.gradle to work
+The aim of this project is to implement a plugin for openbaton that the icinga monitoring solution.
+
+
+Prerequisites:
+1) Openbaton
+2) Rabbitmq
+3) Icinga server and API
+
+
+Installation:
+1) Download the project from:
+     https://github.com/sakshi-bansal/icinga.git
+
+2) Compile
+     ./gradlew -build
+
+3) Run the plugin
+     java -jar build/libs/myplugin-5.0.1-SNAPSHOT.jar
+
+4) To push the containers automatically run the script
+     sh addHostToIcingaServer.sh
+
+5) Visit the following icinga API sites to view the status of the services
+     https://localhost:5665/v1/objects/hosts 
+     https://localhost:5665/v1/objects/services
+
+
+Functions Implemented:
+These are the functions implemented by the plugin:
+
+1) Create PM Job
+     objectSelection - List of hosts for which performance metric is measured
+     performanceMetrics - List of performance metrics 
+     performanceMetricGroup - Null
+     collectionPeriod - How frequent the performance information is collected
+     reportingPeriod - 0
+
+2) Delete PM Job
+     pmJobIdsToDelete - Identifiers of performance jobs to be deleted
+
+3) Query PM Job
+     hostnames - List of hosts for which performance information is required
+     metrics - List of performance metrics for which information is required 
+     period - 0
+
+4) Create Threshold
+      objectSelector - List of hosts for which threshold should be created
+      performanceMetrics - List of performance metrics 
+      thresholdType - null
+      thresholdDetails - Trigger severity, one/all triggers
+
+5) Delete Threshold
+      thresholdIds - Identifiers of thresholds to be deleted
+
+6) Query Threshold
+      queryFilter - Query the status of the thresholds (triggered/not triggered)
+
+7) Subscribe For Fault
+      AlarmEndPoint - Hostname, type, endpoint, severity
+
+8) Unsubscribe For Fault
+      AlarmEndPoint - Hostname, type, endpoint, severity
+
+9) Get Alarm List
+       perceivedSeverity - Get triggered alarms that match this severity level
+
+
+Notification type
+1) New alarm
+     Generated when a threshold is crossed 
+
+2) Alarm state change
+     Generated when the state of an already triggered alarm is changed
+
+
+Severity Mapping:
+  WARNING  - Intermediate
+  WARNING  - Warning
+  UNKNOWN  - Minor
+  CRITICAL - Major
+  CRITICAL - Critical
+
